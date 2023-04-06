@@ -1,0 +1,18 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "chunkwrap"
+version = "0.1.0"
+description = "Split a text file into smaller chunks and include a defined wrapper"
+authors = ["Your Name <your@email.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.2.2"
+
+[tool.poetry.scripts]
+chunkwrap = "chunkwrap.main:main"
