@@ -1,7 +1,5 @@
 from pathlib import Path
-
 import pytest
-
 from chunkwrap.chunkwrap import split_file_into_chunks
 
 
@@ -30,6 +28,22 @@ def input_file(input_file_content: str) -> Path:
     input_file_path.write_text(input_file_content)
 
     yield input_file_path
+
+
+@pytest.fixture
+def pre_file() -> Path:
+    tmp_dir = Path("tmp")
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    pre_file_path = tmp_dir / "pre.md"
+    pre_file_path.write_text("Prepend this text.\n")
+
+    yield pre_file_path
+
+
+@pytest.fixture
+def end_token() -> str:
+    return "CUSTOM_END"
 
 
 def remove_existing_files(directory: Path, pattern: str) -> None:
@@ -62,6 +76,54 @@ def test_split_file_into_chunks(input_file: Path, input_file_content: str):
 
     # Verify that the generated files reconstitute the original content
     assert reconstructed_content == input_file_content
+
+    # Verify side-effect avoided
+    assert input_file.exists()
+    assert input_file.read_text() == input_file_content
+
+
+def test_split_file_with_pre_and_end(
+    input_file: Path,
+    input_file_content: str,
+    pre_file: Path,
+    end_token: str,
+):
+    chunk_size = 4000
+
+    output_dir = Path("tmp") / f"{input_file.stem}-chunks-pre-end"
+    remove_existing_files(output_dir, "*.md")
+
+    split_file_into_chunks(
+        input_file,
+        chunk_size,
+        output_dir,
+        pre_file=pre_file,
+        end_token=end_token,  # noqa: E501
+    )
+
+    # Verify side-effect achieved
+    assert output_dir.exists()
+    assert output_dir.is_dir()
+
+    output_files = sorted(output_dir.glob("*.md"))
+    assert output_files
+
+    # Verify the contents of the generated files
+    reconstructed_content = ""
+    for output_file in output_files:
+        with output_file.open() as f:
+            file_content = f.read()
+            assert len(file_content.encode("utf-8")) <= chunk_size
+            assert file_content.endswith(end_token)
+            reconstructed_content += file_content
+
+    # Verify that the generated files reconstitute the original content with
+    # pre and end tokens
+    expected_content = pre_file.read_text() + input_file_content
+    expected_content += end_token * (
+        len(output_files) - 1
+    )  # end_token added to all but the last file
+    assert reconstructed_content == expected_content
 
     # Verify side-effect avoided
     assert input_file.exists()
